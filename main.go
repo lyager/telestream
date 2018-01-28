@@ -1,31 +1,48 @@
 package main
 
 import (
-	"github.com/go-telegram-bot-api/telegram-bot-api"
+	tb "gopkg.in/tucnak/telebot.v2"
 	"log"
 	"os"
+	"time"
 )
 
+type MyPoller struct {
+}
+
+func (p *MyPoller) Poll(b *tb.Bot, dest chan tb.Update, stop chan struct{}) {
+	log.Println("Hallelujahhh")
+	for {
+		user := tb.User{ID: -305152601}
+		// user := tb.User{Username: "-305152601"}
+		b.Send(&user, "Dingdong")
+		time.Sleep(3)
+	}
+}
+
 func main() {
-	bot, err := tgbotapi.NewBotAPI(os.Getenv("BOT_TOKEN"))
+	bot_token := os.Getenv("BOT_TOKEN")
+
+	if bot_token == "" {
+		log.Panic("Bot token not specified")
+	}
+	b, err := tb.NewBot(tb.Settings{
+		Token:  bot_token,
+		Poller: &MyPoller{},
+		//Poller: &tb.LongPoller{Timeout: 10 * time.Second},
+	})
+
 	if err != nil {
-		log.Panic("Please define BOT_TOKEN")
+		log.Panic(err)
 	}
 
-	log.Printf("Authorized bot with name %s", bot.Self.UserName)
+	//b.Send(tb.Recipient("TelestreamGroup"), "YO!")
+	b.Handle("/hi", func(m *tb.Message) {
+		// TODO Why is 'b' actually visible in here?
+		log.Println("Channel: ", m.Chat)
+		b.Send(m.Sender, "Hi "+m.Sender.Username)
+	})
 
-	// JLN - no idea what this might be
-	u := tgbotapi.NewUpdate(0)
-	u.Timeout = 60
-
-	updates, err := bot.GetUpdatesChan(u)
-
-	for update := range updates {
-		if update.Message == nil {
-			continue
-		}
-
-		log.Printf("[%s] %s", update.Message.From.UserName, update.Message.Text)
-	}
+	b.Start()
 
 }
