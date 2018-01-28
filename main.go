@@ -1,10 +1,10 @@
 package main
 
 import (
+	"bufio"
 	tb "gopkg.in/tucnak/telebot.v2"
 	"log"
 	"os"
-	"time"
 )
 
 type MyPoller struct {
@@ -12,11 +12,16 @@ type MyPoller struct {
 
 func (p *MyPoller) Poll(b *tb.Bot, dest chan tb.Update, stop chan struct{}) {
 	log.Println("Hallelujahhh")
+	reader := bufio.NewReader(os.Stdin)
 	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			//log.("Failed to read from Stdin", err)
+			break
+		}
+		// log.Println("Got line ", line)
 		user := tb.User{ID: -305152601}
-		// user := tb.User{Username: "-305152601"}
-		b.Send(&user, "Dingdong")
-		time.Sleep(3)
+		b.Send(&user, line)
 	}
 }
 
