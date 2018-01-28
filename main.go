@@ -15,7 +15,7 @@ func (p *MyPoller) Poll(b *tb.Bot, dest chan tb.Update, stop chan struct{}) {
 	for {
 		line, err := reader.ReadString('\n')
 		if err != nil {
-			//log.("Failed to read from Stdin", err)
+			log.Println("Unable to read further from stdin: ", err)
 			break
 		}
 		user := tb.User{ID: -305152601}
