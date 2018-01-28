@@ -11,7 +11,6 @@ type MyPoller struct {
 }
 
 func (p *MyPoller) Poll(b *tb.Bot, dest chan tb.Update, stop chan struct{}) {
-	log.Println("Hallelujahhh")
 	reader := bufio.NewReader(os.Stdin)
 	for {
 		line, err := reader.ReadString('\n')
@@ -19,7 +18,6 @@ func (p *MyPoller) Poll(b *tb.Bot, dest chan tb.Update, stop chan struct{}) {
 			//log.("Failed to read from Stdin", err)
 			break
 		}
-		// log.Println("Got line ", line)
 		user := tb.User{ID: -305152601}
 		b.Send(&user, line)
 	}
