@@ -19,7 +19,7 @@ func (p *MyPoller) Poll(b *tb.Bot, dest chan tb.Update, stop chan struct{}) {
 			break
 		}
 		user := tb.User{ID: -305152601}
-		b.Send(&user, line)
+		b.Send(&user, "`"+line+"`", &tb.SendOptions{ParseMode: "Markdown"})
 	}
 }
 
