@@ -2,14 +2,22 @@ package main
 
 import (
 	"bufio"
-	tb "gopkg.in/tucnak/telebot.v2"
 	"log"
 	"os"
+	"strings"
+	"time"
+
+	"flag"
+
+	tail "github.com/hpcloud/tail"
+	tb "gopkg.in/tucnak/telebot.v2"
 )
 
+// MyPoller - class needed for telebot
 type MyPoller struct {
 }
 
+// Poll - The main telegram bot poller
 func (p *MyPoller) Poll(b *tb.Bot, dest chan tb.Update, stop chan struct{}) {
 	reader := bufio.NewReader(os.Stdin)
 	for {
@@ -23,29 +31,75 @@ func (p *MyPoller) Poll(b *tb.Bot, dest chan tb.Update, stop chan struct{}) {
 	}
 }
 
-func main() {
-	bot_token := os.Getenv("BOT_TOKEN")
+// fileTail open as file (filename) filters it trough `filter`
+// and sends matching output to `output`
+// `filter` == "" means all lines match
+func fileTail(filename string, output chan string, filter string) {
+	t, err := tail.TailFile(filename, tail.Config{Follow: true})
+	if err != nil {
+		log.Fatalln("Failed to tail file: ", filename)
+		return
+	}
 
-	if bot_token == "" {
+	defer t.Cleanup()
+
+	for line := range t.Lines {
+		if line.Err != nil {
+			log.Fatalln("Got error while reading file: ", filename)
+		}
+		if strings.Contains(line.Text, filter) {
+			output <- line.Text
+		}
+	}
+
+}
+func main() {
+
+	filename := flag.String("filename", "", "Filename to read from")
+	botToken := flag.String("token", "", "Telegram bot token (TODO how to get)")
+	receiverID := flag.Int("receiver", 0, "Telegram receiver to send messages to")
+	filter := flag.String("filter", "", "Filter each output line, match with filter")
+
+	flag.Parse()
+
+	log.Println("Bot token:", *botToken)
+	log.Println("Reading from file:", *filename)
+	log.Println("Filter:", *filter)
+
+	if *botToken == "" {
 		log.Panic("Bot token not specified")
 	}
+
+	if *receiverID == 0 {
+		log.Panic("Need receiver to send messages to")
+	}
+
 	b, err := tb.NewBot(tb.Settings{
-		Token:  bot_token,
-		Poller: &MyPoller{},
-		//Poller: &tb.LongPoller{Timeout: 10 * time.Second},
+		Token: *botToken,
+		//Poller: &MyPoller{},
+		Poller: &tb.LongPoller{Timeout: 10 * time.Second},
 	})
+
+	b.Start() // Currently the poller is not used TODO
 
 	if err != nil {
 		log.Panic(err)
 	}
 
-	//b.Send(tb.Recipient("TelestreamGroup"), "YO!")
-	b.Handle("/hi", func(m *tb.Message) {
-		// TODO Why is 'b' actually visible in here?
-		log.Println("Channel: ", m.Chat)
-		b.Send(m.Sender, "Hi "+m.Sender.Username)
-	})
+	lineOut := make(chan string)
+	go fileTail(*filename, lineOut, *filter)
 
-	b.Start()
+	user := tb.User{ID: *receiverID}
+	for {
+		select {
+		case line := <-lineOut:
+			//log.Println("Outter, got line: ", line)
+			b.Send(&user, "`"+line+"`", &tb.SendOptions{ParseMode: "Markdown"})
+		default:
+			time.Sleep(1)
+		}
+	}
+
+	//b.Start()
 
 }
