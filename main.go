@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"log"
 	"os"
+	"os/signal"
 	"strings"
 	"time"
 
@@ -34,7 +35,7 @@ func (p *MyPoller) Poll(b *tb.Bot, dest chan tb.Update, stop chan struct{}) {
 // fileTail open as file (filename) filters it trough `filter`
 // and sends matching output to `output`
 // `filter` == "" means all lines match
-func fileTail(filename string, output chan string, filter string) {
+func fileTail(filename string, filter string, output chan string, shutdown chan os.Signal) {
 	t, err := tail.TailFile(filename, tail.Config{Follow: true})
 	if err != nil {
 		log.Fatalln("Failed to tail file: ", filename)
@@ -53,6 +54,7 @@ func fileTail(filename string, output chan string, filter string) {
 	}
 
 }
+
 func main() {
 
 	filename := flag.String("filename", "", "Filename to read from")
@@ -74,32 +76,36 @@ func main() {
 		log.Panic("Need receiver to send messages to")
 	}
 
+	// Setup shutdown signal
+	shutdownSignal := make(chan os.Signal, 1)
+	signal.Notify(shutdownSignal, os.Interrupt)
+
 	b, err := tb.NewBot(tb.Settings{
 		Token: *botToken,
 		//Poller: &MyPoller{},
 		Poller: &tb.LongPoller{Timeout: 10 * time.Second},
 	})
-
-	b.Start() // Currently the poller is not used TODO
-
 	if err != nil {
 		log.Panic(err)
 	}
+	defer b.Stop()
 
 	lineOut := make(chan string)
-	go fileTail(*filename, lineOut, *filter)
+	go fileTail(*filename, *filter, lineOut, shutdownSignal)
 
 	user := tb.User{ID: *receiverID}
+DONE:
 	for {
 		select {
 		case line := <-lineOut:
 			//log.Println("Outter, got line: ", line)
 			b.Send(&user, "`"+line+"`", &tb.SendOptions{ParseMode: "Markdown"})
+		case <-shutdownSignal:
+			log.Println("Performing shutdown")
+			break DONE
 		default:
 			time.Sleep(1)
 		}
 	}
-
-	//b.Start()
 
 }
