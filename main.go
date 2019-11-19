@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"log"
 	"os"
 	"os/signal"
@@ -18,25 +17,16 @@ import (
 type MyPoller struct {
 }
 
-// Poll - The main telegram bot poller
-func (p *MyPoller) Poll(b *tb.Bot, dest chan tb.Update, stop chan struct{}) {
-	reader := bufio.NewReader(os.Stdin)
-	for {
-		line, err := reader.ReadString('\n')
-		if err != nil {
-			log.Println("Unable to read further from stdin: ", err)
-			break
-		}
-		user := tb.User{ID: -305152601}
-		b.Send(&user, "`"+line+"`", &tb.SendOptions{ParseMode: "Markdown"})
-	}
-}
-
 // fileTail open as file (filename) filters it trough `filter`
 // and sends matching output to `output`
 // `filter` == "" means all lines match
 func fileTail(filename string, filter string, output chan string, shutdown chan os.Signal) {
-	t, err := tail.TailFile(filename, tail.Config{Follow: true})
+	t, err := tail.TailFile(filename, tail.Config{
+		Location: &tail.SeekInfo{
+			Offset: 0,
+			Whence: 2},
+		Follow: true,
+		ReOpen: true})
 	if err != nil {
 		log.Fatalln("Failed to tail file: ", filename)
 		return
@@ -90,6 +80,7 @@ func main() {
 	}
 	defer b.Stop()
 
+	// Tail and filter, using a channel for communication
 	lineOut := make(chan string)
 	go fileTail(*filename, *filter, lineOut, shutdownSignal)
 
